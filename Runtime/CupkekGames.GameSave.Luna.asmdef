@@ -1,0 +1,24 @@
+{
+    "name": "CupkekGames.GameSave.Luna",
+    "rootNamespace": "",
+    "references": [
+        "GUID:8c5a58f4ceeaeff428a5333f02ab4313",
+        "GUID:a57eb40d9a9e0984a816dda1fdae8adf",
+        "GUID:6dfb60cfba2c9d24d97f393c4cac15ae"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.inputsystem",
+            "expression": "",
+            "define": "UNITY_INPUT"
+        }
+    ],
+    "noEngineReferences": false
+}
