@@ -1,4 +1,5 @@
 using CupkekGames.Luna;
+using CupkekGames.Luna.Navigation;
 using UnityEngine.UIElements;
 
 namespace CupkekGames.GameSave.Luna
@@ -29,7 +30,7 @@ namespace CupkekGames.GameSave.Luna
     public void ReturnClicked()
     {
       _returnButton.SetEnabled(false);
-      FadeOutThenDestroy();
+      LunaNavigation.PopBackStack();
     }
   }
 }
