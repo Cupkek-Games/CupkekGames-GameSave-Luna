@@ -30,6 +30,8 @@ namespace CupkekGames.GameSave.Luna
       _lastSaveMetadata = lastSaveInfo.Metadata;
       _lastSaveSlot = lastSaveInfo.SaveSlot;
 
+      // _focusName must be set before base.Awake() so UIViewComponent
+      // picks it up when it registers the panel-reload callback.
       if (_lastSaveMetadata != null)
       {
         _focusName = "ButtonContinue";
@@ -40,19 +42,31 @@ namespace CupkekGames.GameSave.Luna
       }
 
       base.Awake();
+    }
 
-      _buttonContinue = UIDocument.rootVisualElement.Q<Button>("ButtonContinue");
-      _buttonLoad = UIDocument.rootVisualElement.Q<Button>("ButtonLoad");
-      _buttonNewGame = UIDocument.rootVisualElement.Q<Button>("ButtonNewGame");
-      _buttonCredits = UIDocument.rootVisualElement.Q<Button>("ButtonCredits");
-      _buttonSettings = UIDocument.rootVisualElement.Q<Button>("ButtonSettings");
-      _buttonQuit = UIDocument.rootVisualElement.Q<Button>("ButtonQuit");
+    protected override void OnUILoaded(VisualElement root)
+    {
+      base.OnUILoaded(root);
+
+      _buttonContinue = root.Q<Button>("ButtonContinue");
+      _buttonLoad = root.Q<Button>("ButtonLoad");
+      _buttonNewGame = root.Q<Button>("ButtonNewGame");
+      _buttonCredits = root.Q<Button>("ButtonCredits");
+      _buttonSettings = root.Q<Button>("ButtonSettings");
+      _buttonQuit = root.Q<Button>("ButtonQuit");
+
+      // We were enabled before the panel delivered its tree — apply
+      // the enable-side wire/focus now. Subsequent enable cycles route
+      // through OnEnable directly.
+      if (enabled) OnEnable();
     }
 
     protected abstract GameSaveManager<TSaveData, TSaveMetadata> GetSaveManager();
 
     protected virtual void OnEnable()
     {
+      if (_buttonContinue == null) return; // panel hasn't reloaded yet
+
       _buttonContinue.clicked += OnButtonContinueClicked;
       _buttonLoad.clicked += OnButtonLoadClicked;
       _buttonNewGame.clicked += OnButtonNewGameClicked;
@@ -76,6 +90,8 @@ namespace CupkekGames.GameSave.Luna
 
     protected virtual void OnDisable()
     {
+      if (_buttonContinue == null) return;
+
       _buttonContinue.clicked -= OnButtonContinueClicked;
       _buttonLoad.clicked -= OnButtonLoadClicked;
       _buttonNewGame.clicked -= OnButtonNewGameClicked;

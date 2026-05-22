@@ -9,21 +9,24 @@ namespace CupkekGames.GameSave.Luna
     // UI Elements
     private Button _returnButton;
 
-    // Start is called before the first frame update
-    protected override void Awake()
+    protected override void OnUILoaded(VisualElement root)
     {
-      base.Awake();
+      base.OnUILoaded(root);
 
-      _returnButton = UIDocument.rootVisualElement.Q<Button>("ReturnButton");
+      _returnButton = root.Q<Button>("ReturnButton");
+
+      if (enabled) OnEnable();
     }
 
     private void OnEnable()
     {
+      if (_returnButton == null) return; // panel hasn't reloaded yet
       _returnButton.clicked += ReturnClicked;
     }
 
     private void OnDisable()
     {
+      if (_returnButton == null) return;
       _returnButton.clicked -= ReturnClicked;
     }
 

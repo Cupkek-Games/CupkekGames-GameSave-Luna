@@ -14,16 +14,20 @@ namespace CupkekGames.GameSave.Luna
     private Coroutine _hideCoroutine;
     [SerializeField] private Color _colorLoading = Color.magenta;
     [SerializeField] private Color _colorComplete = Color.green;
-    protected override void Awake()
+    protected override void OnUILoaded(VisualElement root)
     {
-      base.Awake();
+      base.OnUILoaded(root);
 
-      _container = UIDocument.rootVisualElement.Q<VisualElement>("AutoSave");
+      _container = root.Q<VisualElement>("AutoSave");
       _radial = _container.Q<RadialLoading>();
+
+      if (enabled) OnEnable();
     }
 
     private void OnEnable()
     {
+      if (_radial == null) return; // panel hasn't reloaded yet
+
       _radial.StopAnimation();
 
       GameSaveEvents.AutosaveStart += OnSavingStart;
@@ -31,6 +35,8 @@ namespace CupkekGames.GameSave.Luna
     }
     private void OnDisable()
     {
+      if (_radial == null) return;
+
       _radial.StopAnimation();
 
       GameSaveEvents.AutosaveStart -= OnSavingStart;
