@@ -14,7 +14,7 @@ using UnityEngine.InputSystem;
 
 namespace CupkekGames.GameSave.Luna
 {
-  [RequireComponent(typeof(UIDocument))]
+  [RequireComponent(typeof(PanelRenderer))]
   [RequireComponent(typeof(GameSaveView))]
   public abstract class GameSaveViewList<TSaveData, TSaveMetadata> : MonoBehaviour where TSaveData : IGameSaveData, IData, new()
     where TSaveMetadata : GameSaveMetadata
