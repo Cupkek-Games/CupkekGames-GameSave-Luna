@@ -45,13 +45,19 @@ namespace CupkekGames.GameSave.Luna
 
     public void OnSavingStart()
     {
-      Show();
+      BeginIndicator();
     }
     public void OnSavingComplete()
     {
-      Hide();
+      EndIndicator();
     }
-    public void Show()
+
+    // Renamed from Show/Hide to avoid colliding with the base
+    // UIViewComponent.Show/Hide (which drive the fade-in/out
+    // pipeline). The autosave indicator is a self-contained
+    // radial-loading animation in this view's USS, not a nav
+    // visibility change.
+    private void BeginIndicator()
     {
       _radial.ProgressColorOverride = _colorLoading;
       _radial.ArcSize = 0.2f;
@@ -60,7 +66,8 @@ namespace CupkekGames.GameSave.Luna
 
       CancelDelayedHide();
     }
-    public void Hide()
+
+    private void EndIndicator()
     {
       CancelDelayedHide();
 
