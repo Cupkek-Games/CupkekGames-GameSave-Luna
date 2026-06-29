@@ -51,25 +51,15 @@ namespace CupkekGames.GameSave.Luna
 
     protected virtual void Awake()
     {
+      // Component refs resolve at Awake; element lookups do NOT — this view
+      // renders through a PanelRenderer that delivers its tree asynchronously
+      // (no UIDocument / synchronous rootVisualElement). Defer everything that
+      // touches the tree to the UILoaded milestone (see OnUILoaded).
       _gameSaveManager = GetSaveManager();
-
-      _root = GetComponent<UIDocument>().rootVisualElement;
-
       _gameSaveView = GetComponent<GameSaveView>();
-
-      _newSaveButton = _root.Q<Button>("NewSave");
-      _showAutoToggle = _root.Q<Toggle>("ShowAuto");
-      _showManualToggle = _root.Q<Toggle>("ShowManual");
-
-      _loadSaveButton = _root.Q<InputPrompt>("Load");
-      _overwriteSaveButton = _root.Q<InputPrompt>("Overwrite");
-      _deleteSaveButton = _root.Q<InputPrompt>("Delete");
-
-      _listView = _root.Q<ListView>("LoadList");
-
       _choicePopupController = GetComponent<ChoicePopupController>();
 
-      _listViewWrapper = new ListViewWrapper(_listView);
+      _gameSaveView.WhenUILoaded(OnUILoaded);
     }
 
 
@@ -148,8 +138,24 @@ namespace CupkekGames.GameSave.Luna
       _listViewWrapper.ResetSelection();
     }
 
-    protected virtual void Start()
+    // Element lookups + all element-dependent wiring, run once when the
+    // PanelRenderer tree is live (formerly split across Awake + Start).
+    protected virtual void OnUILoaded()
     {
+      _root = _gameSaveView.ParentElement;
+
+      _newSaveButton = _root.Q<Button>("NewSave");
+      _showAutoToggle = _root.Q<Toggle>("ShowAuto");
+      _showManualToggle = _root.Q<Toggle>("ShowManual");
+
+      _loadSaveButton = _root.Q<InputPrompt>("Load");
+      _overwriteSaveButton = _root.Q<InputPrompt>("Overwrite");
+      _deleteSaveButton = _root.Q<InputPrompt>("Delete");
+
+      _listView = _root.Q<ListView>("LoadList");
+
+      _listViewWrapper = new ListViewWrapper(_listView);
+
       UpdateMetadataCache();
 
       InitializeListView();
@@ -180,22 +186,32 @@ namespace CupkekGames.GameSave.Luna
       _deleteSaveButton.clicked += OnDeleteButtonClicked;
 
 #if UNITY_INPUT
-        _overwriteSaveAction = _overwriteSaveButton.Action;
-        _loadSaveAction = _loadSaveButton.Action;
-        _deleteSaveAction = _deleteSaveButton.Action;
-
-        _loadSaveAction.performed += OnLoadInputPerformed;
-        _deleteSaveAction.performed += OnDeleteInputPerformed;
-        
-        if (_isInGame)
-        {
-          _overwriteSaveAction.performed += OnOverwriteInputPerformed;
-        }
+      // InputPrompt resolves its backing InputAction on its own AttachToPanel,
+      // which can run after this view's OnUILoaded. Defer a frame so the
+      // actions exist; WireInputActions null-guards for a missing input device.
+      _root.schedule.Execute(WireInputActions);
 #endif
     }
 
+#if UNITY_INPUT
+    private void WireInputActions()
+    {
+      _overwriteSaveAction = _overwriteSaveButton.Action;
+      _loadSaveAction = _loadSaveButton.Action;
+      _deleteSaveAction = _deleteSaveButton.Action;
+
+      if (_loadSaveAction != null) _loadSaveAction.performed += OnLoadInputPerformed;
+      if (_deleteSaveAction != null) _deleteSaveAction.performed += OnDeleteInputPerformed;
+      if (_isInGame && _overwriteSaveAction != null) _overwriteSaveAction.performed += OnOverwriteInputPerformed;
+    }
+#endif
+
     protected virtual void OnDestroy()
     {
+      // Teardown only applies if the tree loaded (OnUILoaded ran). Guard so a
+      // view destroyed before its panel loaded doesn't NRE here.
+      if (_newSaveButton == null) return;
+
       _newSaveButton.clicked -= OnNewSaveButtonClicked;
 
       _showAutoToggle.UnregisterValueChangedCallback(OnShowAutoToggleChanged);
@@ -209,9 +225,9 @@ namespace CupkekGames.GameSave.Luna
       _listViewWrapper?.Disable();
 
 #if UNITY_INPUT
-        _loadSaveAction.performed -= OnLoadInputPerformed;
-        _overwriteSaveAction.performed -= OnOverwriteInputPerformed;
-        _deleteSaveAction.performed -= OnDeleteInputPerformed;
+      if (_loadSaveAction != null) _loadSaveAction.performed -= OnLoadInputPerformed;
+      if (_overwriteSaveAction != null) _overwriteSaveAction.performed -= OnOverwriteInputPerformed;
+      if (_deleteSaveAction != null) _deleteSaveAction.performed -= OnDeleteInputPerformed;
 #endif
     }
 
