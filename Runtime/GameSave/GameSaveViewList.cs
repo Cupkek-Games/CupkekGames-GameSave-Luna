@@ -4,6 +4,7 @@ using CupkekGames.GameSave;
 using UnityEngine;
 using UnityEngine.UIElements;
 using CupkekGames.Luna;
+using CupkekGames.Luna.Navigation;
 using System.Linq;
 using System.Collections;
 
@@ -42,6 +43,12 @@ namespace CupkekGames.GameSave.Luna
     protected InputPrompt _deleteSaveButton;
     protected ChoicePopupController _choicePopupController;
     protected string _selectedChoiceAction = "";
+
+    [Tooltip("Global ChoicePopup nav destination pushed (with ChoicePopupArgs) for the " +
+             "overwrite/delete confirms. Leave empty to fall back to a node-less " +
+             "ChoicePopupController component on this GameObject (legacy in-view popup).")]
+    [CatalogKeyConstraint(NavConstants.NavDestinationCatalogId)]
+    [SerializeField] protected CatalogKey _confirmDest;
 
 #if UNITY_INPUT
     protected InputAction _loadSaveAction;
@@ -180,7 +187,7 @@ namespace CupkekGames.GameSave.Luna
 
       _showAutoToggle.RegisterValueChangedCallback(OnShowAutoToggleChanged);
       _showManualToggle.RegisterValueChangedCallback(OnShowManualToggleChanged);
-      _choicePopupController.OnButtonClick += OnChoiceButtonClick;
+      if (_choicePopupController != null) _choicePopupController.OnButtonClick += OnChoiceButtonClick;
 
       _loadSaveButton.clicked += OnLoadButtonClicked;
       _deleteSaveButton.clicked += OnDeleteButtonClicked;
@@ -216,7 +223,7 @@ namespace CupkekGames.GameSave.Luna
 
       _showAutoToggle.UnregisterValueChangedCallback(OnShowAutoToggleChanged);
       _showManualToggle.UnregisterValueChangedCallback(OnShowManualToggleChanged);
-      _choicePopupController.OnButtonClick -= OnChoiceButtonClick;
+      if (_choicePopupController != null) _choicePopupController.OnButtonClick -= OnChoiceButtonClick;
 
       _loadSaveButton.clicked -= OnLoadButtonClicked;
       _overwriteSaveButton.clicked -= OnOverwriteButtonClicked;
@@ -300,7 +307,21 @@ namespace CupkekGames.GameSave.Luna
         return;
       }
 
-      string saveSlotText = entry.Value.SaveSlot.ToString();
+      int saveSlot = entry.Value.SaveSlot;
+      string saveSlotText = saveSlot.ToString();
+
+      if (!_confirmDest.IsEmpty)
+      {
+        ConfirmThen("Overwrite Save " + saveSlotText, "Are you sure you want to overwrite this save?", () =>
+        {
+          _gameSaveManager.SaveToFile(saveSlot, _gameSaveManager.CurrentSave.Data);
+          ResetListSelection();
+          UpdateMetadataCache();
+          UpdateListView();
+        });
+        return;
+      }
+
       _selectedChoiceAction = "overwrite";
       _choicePopupController.TextHeader = "Overwrite Save " + saveSlotText;
       _choicePopupController.TextBody = "Are you sure you want to overwrite this save?";
@@ -315,11 +336,44 @@ namespace CupkekGames.GameSave.Luna
         return;
       }
 
-      string saveSlotText = entry.Value.SaveSlot.ToString();
+      int saveSlot = entry.Value.SaveSlot;
+      string saveSlotText = saveSlot.ToString();
+
+      if (!_confirmDest.IsEmpty)
+      {
+        ConfirmThen("Delete Save " + saveSlotText, "Are you sure you want to delete this save?", () =>
+        {
+          _gameSaveManager.DeleteFile(saveSlot);
+          UpdateMetadataCache();
+          UpdateListView();
+        });
+        return;
+      }
+
       _selectedChoiceAction = "delete";
       _choicePopupController.TextHeader = "Delete Save " + saveSlotText;
       _choicePopupController.TextBody = "Are you sure you want to delete this save?";
       _choicePopupController.Fade.FadeIn();
+    }
+
+    // Pushes the confirm destination with per-call args and runs onConfirm when
+    // the affirmative choice (index 0) is picked; Esc/dismiss is a no-op. The
+    // acted-on slot is captured before the push so a selection change while the
+    // popup is open cannot retarget the action.
+    private async void ConfirmThen(string header, string body, System.Action onConfirm)
+    {
+      var result = await LunaNavigation.PushAsync<int>(_confirmDest, new ChoicePopupArgs
+      {
+        Header = header,
+        Body = body,
+      });
+
+      if (this == null) return; // view destroyed while the confirm was open
+
+      if (!result.IsDismissed && result.Value == 0)
+      {
+        onConfirm();
+      }
     }
 
     public GameSaveMetadataWithSlot<TSaveMetadata>? GetSelectedMetadata()

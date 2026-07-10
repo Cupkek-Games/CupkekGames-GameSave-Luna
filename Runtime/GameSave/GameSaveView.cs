@@ -15,7 +15,18 @@ namespace CupkekGames.GameSave.Luna
 
       _returnButton = root.Q<Button>("ReturnButton");
 
+      // ReturnClicked disables the button (double-click protection) and this
+      // view survives its pop (persistent global destination), so re-arm it on
+      // every open. -= before += guards the sync-reload re-run of OnUILoaded.
+      UIView.Fade.OnFadeInStart -= OnFadeInStart;
+      UIView.Fade.OnFadeInStart += OnFadeInStart;
+
       if (enabled) OnEnable();
+    }
+
+    private void OnFadeInStart()
+    {
+      if (_returnButton != null) _returnButton.SetEnabled(true);
     }
 
     private void OnEnable()

@@ -7,7 +7,7 @@ Luna UI bindings for [CupkekGames.GameSave](https://github.com/Cupkek-Games/Cupk
 **Runtime** (`CupkekGames.GameSave.Luna.asmdef`)
 
 - `MainMenuView<TSaveData, TSaveMetadata>` — `UIViewComponent` base wiring Continue/Load/NewGame/Credits/Settings/Quit buttons against the last-save metadata; subclass and override `GetSaveManager()` + the `OnButton*Clicked` handlers.
-- `GameSaveViewList<TSaveData, TSaveMetadata>` — `MonoBehaviour` base for a slot list with auto/manual filters, load/overwrite/delete actions, and `ChoicePopupController`-driven confirmation; pairs with the concrete `GameSaveView` on the same GameObject.
+- `GameSaveViewList<TSaveData, TSaveMetadata>` — `MonoBehaviour` base for a slot list with auto/manual filters, load/overwrite/delete actions, and confirmation prompts; pairs with the concrete `GameSaveView` on the same GameObject. Overwrite/delete confirms push the serialized `_confirmDest` nav destination (a global node-bound `ChoicePopupController`, parameterized per call with `ChoicePopupArgs` and awaited via `PushAsync<int>`, index 0 = confirm); leave the key empty to fall back to a node-less `ChoicePopupController` component on the same GameObject (legacy in-view popup).
 - `GameSaveView` — `UIViewComponent` shell with a Return button that fades the view out and destroys it.
 - `GameSaveViewEntry<TSaveMetadata>` — per-row binding helper used by `GameSaveViewList`'s `ListView`.
 - `AutoSaveView` — `UIViewComponent` driven by `GameSaveEvents.AutosaveStart` / `AutosaveComplete`; shows a `RadialLoading` indicator on autosave.
