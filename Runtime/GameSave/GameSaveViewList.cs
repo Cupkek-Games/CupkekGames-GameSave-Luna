@@ -41,12 +41,10 @@ namespace CupkekGames.GameSave.Luna
     protected InputPrompt _loadSaveButton;
     protected InputPrompt _overwriteSaveButton;
     protected InputPrompt _deleteSaveButton;
-    protected ChoicePopupController _choicePopupController;
-    protected string _selectedChoiceAction = "";
 
     [Tooltip("Global ChoicePopup nav destination pushed (with ChoicePopupArgs) for the " +
-             "overwrite/delete confirms. Leave empty to fall back to a node-less " +
-             "ChoicePopupController component on this GameObject (legacy in-view popup).")]
+             "overwrite/delete confirms. Required — a shared node-bound ChoicePopupController, " +
+             "e.g. the 'confirm' node.")]
     [CatalogKeyConstraint(NavConstants.NavDestinationCatalogId)]
     [SerializeField] protected CatalogKey _confirmDest;
 
@@ -64,9 +62,28 @@ namespace CupkekGames.GameSave.Luna
       // touches the tree to the UILoaded milestone (see OnUILoaded).
       _gameSaveManager = GetSaveManager();
       _gameSaveView = GetComponent<GameSaveView>();
-      _choicePopupController = GetComponent<ChoicePopupController>();
+
+      ConfirmDestIsSet();
 
       _gameSaveView.WhenUILoaded(OnUILoaded);
+    }
+
+#if UNITY_EDITOR
+    protected virtual void OnValidate()
+    {
+      if (Application.isPlaying) return;
+      if (_confirmDest.IsEmpty)
+        Debug.LogWarning("[GameSaveViewList] _confirmDest is not set — assign the global ChoicePopup nav destination (e.g. 'confirm'); overwrite/delete confirms route through it.", this);
+    }
+#endif
+
+    // _confirmDest is required: overwrite/delete confirms route through the
+    // global confirm destination.
+    private bool ConfirmDestIsSet()
+    {
+      if (!_confirmDest.IsEmpty) return true;
+      Debug.LogError("[GameSaveViewList] _confirmDest is not set — assign the global ChoicePopup nav destination (e.g. 'confirm'); overwrite/delete confirms cannot run without it.", this);
+      return false;
     }
 
 
@@ -187,7 +204,6 @@ namespace CupkekGames.GameSave.Luna
 
       _showAutoToggle.RegisterValueChangedCallback(OnShowAutoToggleChanged);
       _showManualToggle.RegisterValueChangedCallback(OnShowManualToggleChanged);
-      if (_choicePopupController != null) _choicePopupController.OnButtonClick += OnChoiceButtonClick;
 
       _loadSaveButton.clicked += OnLoadButtonClicked;
       _deleteSaveButton.clicked += OnDeleteButtonClicked;
@@ -223,7 +239,6 @@ namespace CupkekGames.GameSave.Luna
 
       _showAutoToggle.UnregisterValueChangedCallback(OnShowAutoToggleChanged);
       _showManualToggle.UnregisterValueChangedCallback(OnShowManualToggleChanged);
-      if (_choicePopupController != null) _choicePopupController.OnButtonClick -= OnChoiceButtonClick;
 
       _loadSaveButton.clicked -= OnLoadButtonClicked;
       _overwriteSaveButton.clicked -= OnOverwriteButtonClicked;
@@ -307,25 +322,18 @@ namespace CupkekGames.GameSave.Luna
         return;
       }
 
+      if (!ConfirmDestIsSet()) return;
+
       int saveSlot = entry.Value.SaveSlot;
       string saveSlotText = saveSlot.ToString();
 
-      if (!_confirmDest.IsEmpty)
+      ConfirmThen("Overwrite Save " + saveSlotText, "Are you sure you want to overwrite this save?", () =>
       {
-        ConfirmThen("Overwrite Save " + saveSlotText, "Are you sure you want to overwrite this save?", () =>
-        {
-          _gameSaveManager.SaveToFile(saveSlot, _gameSaveManager.CurrentSave.Data);
-          ResetListSelection();
-          UpdateMetadataCache();
-          UpdateListView();
-        });
-        return;
-      }
-
-      _selectedChoiceAction = "overwrite";
-      _choicePopupController.TextHeader = "Overwrite Save " + saveSlotText;
-      _choicePopupController.TextBody = "Are you sure you want to overwrite this save?";
-      _choicePopupController.Fade.FadeIn();
+        _gameSaveManager.SaveToFile(saveSlot, _gameSaveManager.CurrentSave.Data);
+        ResetListSelection();
+        UpdateMetadataCache();
+        UpdateListView();
+      });
     }
 
     private void OnDeleteButtonClicked()
@@ -336,24 +344,17 @@ namespace CupkekGames.GameSave.Luna
         return;
       }
 
+      if (!ConfirmDestIsSet()) return;
+
       int saveSlot = entry.Value.SaveSlot;
       string saveSlotText = saveSlot.ToString();
 
-      if (!_confirmDest.IsEmpty)
+      ConfirmThen("Delete Save " + saveSlotText, "Are you sure you want to delete this save?", () =>
       {
-        ConfirmThen("Delete Save " + saveSlotText, "Are you sure you want to delete this save?", () =>
-        {
-          _gameSaveManager.DeleteFile(saveSlot);
-          UpdateMetadataCache();
-          UpdateListView();
-        });
-        return;
-      }
-
-      _selectedChoiceAction = "delete";
-      _choicePopupController.TextHeader = "Delete Save " + saveSlotText;
-      _choicePopupController.TextBody = "Are you sure you want to delete this save?";
-      _choicePopupController.Fade.FadeIn();
+        _gameSaveManager.DeleteFile(saveSlot);
+        UpdateMetadataCache();
+        UpdateListView();
+      });
     }
 
     // Pushes the confirm destination with per-call args and runs onConfirm when
@@ -392,26 +393,6 @@ namespace CupkekGames.GameSave.Luna
     protected abstract VisualElement SlotOne(int index, GameSaveMetadataWithSlot<TSaveMetadata> metadata);
     protected abstract VisualElement SlotTwo(int index, GameSaveMetadataWithSlot<TSaveMetadata> metadata);
     protected abstract TooltipController GetTooltipController();
-
-    private void OnChoiceButtonClick(int i)
-    {
-      if (i == 0)
-      {
-        GameSaveMetadataWithSlot<TSaveMetadata> metadata = _metadataFiltered[_listView.selectedIndex];
-        if (_selectedChoiceAction == "overwrite")
-        {
-          _gameSaveManager.SaveToFile(metadata.SaveSlot, _gameSaveManager.CurrentSave.Data);
-          ResetListSelection();
-        }
-        else if (_selectedChoiceAction == "delete")
-        {
-          _gameSaveManager.DeleteFile(metadata.SaveSlot);
-        }
-
-        UpdateMetadataCache();
-        UpdateListView();
-      }
-    }
 
 #if UNITY_INPUT
     private void OnLoadInputPerformed(InputAction.CallbackContext context)
