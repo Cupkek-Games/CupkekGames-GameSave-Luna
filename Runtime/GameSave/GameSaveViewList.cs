@@ -30,8 +30,7 @@ namespace CupkekGames.GameSave.Luna
     // UI
     protected VisualElement _root;
     [SerializeField] protected VisualTreeAsset _listEntryTemplate;
-    protected ListView _listView;
-    protected ListViewWrapper _listViewWrapper;
+    protected LunaListView _listView;
     List<GameSaveMetadataWithSlot<TSaveMetadata>> _metadataCache;
     List<GameSaveMetadataWithSlot<TSaveMetadata>> _metadataFiltered;
     protected bool _isInGame;
@@ -89,7 +88,9 @@ namespace CupkekGames.GameSave.Luna
 
     private void InitializeListView()
     {
-      _listView.makeItem = () =>
+      _listView.SelectionType = SelectionType.Single;
+
+      _listView.MakeItem = () =>
       {
         VisualElement item = _listEntryTemplate.Instantiate();
 
@@ -101,7 +102,7 @@ namespace CupkekGames.GameSave.Luna
         return item;
       };
 
-      _listView.bindItem = (item, index) =>
+      _listView.BindItem = (item, index) =>
       {
         GameSaveViewEntry<TSaveMetadata> entry = (GameSaveViewEntry<TSaveMetadata>)item.userData;
 
@@ -117,49 +118,31 @@ namespace CupkekGames.GameSave.Luna
         );
       };
 
-      _listView.unbindItem = (item, index) =>
+      _listView.UnbindItem = (item, index) =>
       {
         GameSaveViewEntry<TSaveMetadata> entry = (GameSaveViewEntry<TSaveMetadata>)item.userData;
         entry.UnbindItem();
       };
 
-      _listView.selectionChanged += OnSelectionChanged;
-    }
-
-    protected virtual void RegisterCallbacks()
-    {
-      // Handle boundary navigation - which element to navigate to at edges
-      _listViewWrapper.OnGetBoundaryNavigationTarget += (direction) =>
-      {
-        // Called when at boundary (first or last item) and navigating Up/Down/Next/Previous
-        if (direction == NavigationMoveEvent.Direction.Up ||
-            direction == NavigationMoveEvent.Direction.Down ||
-            direction == NavigationMoveEvent.Direction.Next ||
-            direction == NavigationMoveEvent.Direction.Previous)
-        {
-          // Return the element to navigate to
-          if (_newSaveButton.enabledSelf)
-            return _newSaveButton;
-          else
-            return _showAutoToggle;
-        }
-
-        return null;
-      };
-
-      // Handle horizontal navigation (Left/Right)
-      _listViewWrapper.OnNavigateHorizontal += (direction) => { _showAutoToggle.Focus(); };
-
-      // Enable wrapper (registers FocusInEvent and NavigationMoveEvent on ListView)
-      _listViewWrapper.Enable();
-
-      // Register bidirectional navigation from adjacent element back to ListView
-      _listViewWrapper.RegisterAdjacentElementNavigation(_newSaveButton, _showAutoToggle);
+      _listView.SelectionChanged += OnSelectionChanged;
     }
 
     public void ResetListSelection()
     {
-      _listViewWrapper.ResetSelection();
+      // LunaListView owns gamepad navigation (selection cursor; boundary
+      // exits fall through to default focus navigation), so the old
+      // ListViewWrapper boundary wiring is gone.
+      int itemCount = _listView.ItemsSource != null ? _listView.ItemsSource.Count : 0;
+      if (itemCount > 0)
+      {
+        _listView.SelectedIndex = 0;
+        _listView.ScrollToIndex(0);
+      }
+      else
+      {
+        _listView.SelectedIndex = -1;
+      }
+      _listView.Focus();
     }
 
     // Element lookups + all element-dependent wiring, run once when the
@@ -176,15 +159,12 @@ namespace CupkekGames.GameSave.Luna
       _overwriteSaveButton = _root.Q<InputPrompt>("Overwrite");
       _deleteSaveButton = _root.Q<InputPrompt>("Delete");
 
-      _listView = _root.Q<ListView>("LoadList");
-
-      _listViewWrapper = new ListViewWrapper(_listView);
+      _listView = _root.Q<LunaListView>("LoadList");
 
       UpdateMetadataCache();
 
       InitializeListView();
-      RegisterCallbacks();
-      _listView.itemsSource = _metadataFiltered;
+      _listView.ItemsSource = _metadataFiltered;
       ResetListSelection();
 
       _listView.Focus();
@@ -244,7 +224,7 @@ namespace CupkekGames.GameSave.Luna
       _overwriteSaveButton.clicked -= OnOverwriteButtonClicked;
       _deleteSaveButton.clicked -= OnDeleteButtonClicked;
 
-      _listViewWrapper?.Disable();
+      if (_listView != null) _listView.SelectionChanged -= OnSelectionChanged;
 
 #if UNITY_INPUT
       if (_loadSaveAction != null) _loadSaveAction.performed -= OnLoadInputPerformed;
@@ -295,13 +275,16 @@ namespace CupkekGames.GameSave.Luna
 
     private void UpdateListView()
     {
-      _listView.itemsSource = _metadataFiltered;
-      _listView.RefreshItems();
-      _listViewWrapper.ValidateSelection();
+      // Assigning a new ItemsSource clears the selection silently; restore the
+      // previous index clamped to the new count (old ValidateSelection parity).
+      int previous = _listView.SelectedIndex;
+      _listView.ItemsSource = _metadataFiltered;
+      _listView.Rebuild();
 
-      if (_listView.selectedIndex > -1 && _listView.selectedIndex < _metadataFiltered.Count)
+      int count = _metadataFiltered.Count;
+      if (previous > -1 && count > 0)
       {
-        OnSelectionChanged();
+        _listView.SelectedIndex = Mathf.Min(previous, count - 1);
       }
     }
 
@@ -379,12 +362,12 @@ namespace CupkekGames.GameSave.Luna
 
     public GameSaveMetadataWithSlot<TSaveMetadata>? GetSelectedMetadata()
     {
-      if (_listView.selectedIndex < 0 || _listView.selectedIndex >= _metadataFiltered.Count)
+      if (_listView.SelectedIndex < 0 || _listView.SelectedIndex >= _metadataFiltered.Count)
       {
         return null;
       }
 
-      return _metadataFiltered[_listView.selectedIndex];
+      return _metadataFiltered[_listView.SelectedIndex];
     }
 
     protected abstract void OnLoadButtonClicked();
