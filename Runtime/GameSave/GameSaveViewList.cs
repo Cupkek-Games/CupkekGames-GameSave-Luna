@@ -169,18 +169,15 @@ namespace CupkekGames.GameSave.Luna
 
       _listView.Focus();
 
-      _isInGame = IsInGame();
+      _newSaveButton.clicked += OnNewSaveButtonClicked;
+      _overwriteSaveButton.clicked += OnOverwriteButtonClicked;
 
-      if (_isInGame)
-      {
-        _newSaveButton.clicked += OnNewSaveButtonClicked;
-        _overwriteSaveButton.clicked += OnOverwriteButtonClicked;
-      }
-      else
-      {
-        _newSaveButton.SetEnabled(false);
-        _overwriteSaveButton.style.display = DisplayStyle.None;
-      }
+      // This view is a persistent destination: the same instance is opened from
+      // the main menu and from a running game, so whether saving is allowed is
+      // asked on every open, not once at load.
+      _gameSaveView.Fade.OnFadeInStart -= RefreshForOpen;
+      _gameSaveView.Fade.OnFadeInStart += RefreshForOpen;
+      ApplyInGame();
 
       _showAutoToggle.RegisterValueChangedCallback(OnShowAutoToggleChanged);
       _showManualToggle.RegisterValueChangedCallback(OnShowManualToggleChanged);
@@ -205,7 +202,7 @@ namespace CupkekGames.GameSave.Luna
 
       if (_loadSaveAction != null) _loadSaveAction.performed += OnLoadInputPerformed;
       if (_deleteSaveAction != null) _deleteSaveAction.performed += OnDeleteInputPerformed;
-      if (_isInGame && _overwriteSaveAction != null) _overwriteSaveAction.performed += OnOverwriteInputPerformed;
+      if (_overwriteSaveAction != null) _overwriteSaveAction.performed += OnOverwriteInputPerformed;
     }
 #endif
 
@@ -216,6 +213,7 @@ namespace CupkekGames.GameSave.Luna
       if (_newSaveButton == null) return;
 
       _newSaveButton.clicked -= OnNewSaveButtonClicked;
+      if (_gameSaveView != null && _gameSaveView.Fade != null) _gameSaveView.Fade.OnFadeInStart -= RefreshForOpen;
 
       _showAutoToggle.UnregisterValueChangedCallback(OnShowAutoToggleChanged);
       _showManualToggle.UnregisterValueChangedCallback(OnShowManualToggleChanged);
@@ -288,8 +286,28 @@ namespace CupkekGames.GameSave.Luna
       }
     }
 
+    // Saving (a new save, an overwrite) needs a running game; outside one the
+    // two controls stay visible and disabled.
+    private void ApplyInGame()
+    {
+      _isInGame = IsInGame();
+      _newSaveButton.SetEnabled(_isInGame);
+      _overwriteSaveButton.SetEnabled(_isInGame);
+    }
+
+    private void RefreshForOpen()
+    {
+      ApplyInGame();
+
+      // Saves made since the last open (autosaves, other screens).
+      UpdateMetadataCache();
+      UpdateListView();
+    }
+
     private void OnNewSaveButtonClicked()
     {
+      if (!_isInGame) return;
+
       int availableSlot = _gameSaveManager.GetFirstAvailableSlot();
       _gameSaveManager.SaveToFile(availableSlot, _gameSaveManager.CurrentSave.Data);
 
@@ -299,6 +317,8 @@ namespace CupkekGames.GameSave.Luna
 
     private void OnOverwriteButtonClicked()
     {
+      if (!_isInGame) return;
+
       GameSaveMetadataWithSlot<TSaveMetadata>? entry = GetSelectedMetadata();
       if (!entry.HasValue)
       {
