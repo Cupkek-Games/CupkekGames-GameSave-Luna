@@ -398,19 +398,25 @@ namespace CupkekGames.GameSave.Luna
     protected abstract TooltipController GetTooltipController();
 
 #if UNITY_INPUT
+    // The view is a persistent destination: its graph loads it hidden and keeps
+    // it after a pop, so these actions stay wired while it is closed. Its keys
+    // act only while it shows, or a hidden list would load, overwrite or
+    // delete a save on a key the game shares (Interact).
+    private bool IsOpen => _gameSaveView.UIView.IsVisible;
+
     private void OnLoadInputPerformed(InputAction.CallbackContext context)
     {
-      OnLoadButtonClicked();
+      if (IsOpen) OnLoadButtonClicked();
     }
-    
+
     private void OnOverwriteInputPerformed(InputAction.CallbackContext context)
     {
-      OnOverwriteButtonClicked();
+      if (IsOpen) OnOverwriteButtonClicked();
     }
 
     private void OnDeleteInputPerformed(InputAction.CallbackContext context)
     {
-      OnDeleteButtonClicked();
+      if (IsOpen) OnDeleteButtonClicked();
     }
 #endif
   }
